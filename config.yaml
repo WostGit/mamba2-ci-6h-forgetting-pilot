@@ -1,0 +1,38 @@
+seed: 1337
+runtime:
+  hard_budget_hours: 6.0
+  target_hours: 4.0
+  stage_estimates_minutes:
+    baseline_eval: 35
+    train_short: 55
+    eval_post_short: 35
+    train_replay: 55
+    eval_post_replay: 35
+    report: 10
+model:
+  name: state-spaces/mamba2-130m
+  torch_dtype: float32
+  cache_dir: .cache/hf
+  trust_remote_code: false
+training:
+  batch_size: 1
+  learning_rate: 2.0e-5
+  max_steps: 80
+  min_steps_on_guard: 60
+  sequence_length: 256
+  grad_accum_steps: 1
+  max_grad_norm: 1.0
+  trainable_mode: lm_head_only
+  checkpoint_subdir: artifacts/checkpoints
+  short_length: 256
+  replay_length: 1024
+evaluation:
+  lengths: [1024, 2048, 4096, 8192]
+  examples_per_length: 3
+  fallback_examples_per_length: 2
+  passkey_digits: 8
+  max_new_tokens: 16
+paths:
+  metrics_dir: artifacts/metrics
+  report_dir: artifacts/report
+  temp_dir: artifacts/tmp
