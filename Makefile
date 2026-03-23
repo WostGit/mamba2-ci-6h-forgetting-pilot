@@ -2,8 +2,9 @@ PYTHON ?= python3
 
 setup:
 	$(PYTHON) -m pip install --upgrade pip
-	# CI/runtime-saving choice: force CPU wheels to avoid multi-GB CUDA downloads on GitHub runners.
-	$(PYTHON) -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<2.6"
+	# CI/runtime-saving choice: force CPU wheels and require torch>=2.6 because
+	# current Transformers blocks checkpoint loading via torch.load on older versions.
+	$(PYTHON) -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6,<3.0"
 	$(PYTHON) -m pip install -r requirements.txt
 
 baseline:
