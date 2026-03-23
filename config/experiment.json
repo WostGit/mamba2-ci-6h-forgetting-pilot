@@ -1,0 +1,38 @@
+{
+  "seed": 1337,
+  "model_id": "state-spaces/mamba2-130m",
+  "output_dir": "outputs",
+  "runtime": {
+    "hard_budget_seconds": 21600,
+    "soft_budget_seconds": 14400,
+    "stage_estimates_seconds": {
+      "baseline_eval": 3600,
+      "train_short": 2400,
+      "train_replay": 2400,
+      "final_eval": 3600,
+      "report": 300
+    }
+  },
+  "train": {
+    "steps": 80,
+    "fallback_steps": 60,
+    "batch_size": 1,
+    "seq_len": 256,
+    "lr": 5e-5,
+    "weight_decay": 0.0,
+    "full_finetune": false,
+    "trainable_param_keywords": ["lm_head"],
+    "save_every": 20
+  },
+  "eval": {
+    "context_lengths": [1024, 2048, 4096, 8192],
+    "examples_per_length": 3,
+    "fallback_examples_per_length": 2,
+    "max_new_tokens": 8,
+    "temperature": 0.0
+  },
+  "replay": {
+    "replay_probability": 0.4,
+    "long_context_candidates": [1024, 2048, 4096, 8192]
+  }
+}
