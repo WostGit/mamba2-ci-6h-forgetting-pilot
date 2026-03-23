@@ -1,0 +1,75 @@
+name: mamba2-cpu-pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  run-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      PYTHONUNBUFFERED: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      HF_HOME: ${{ github.workspace }}/.cache/huggingface
+      TRANSFORMERS_CACHE: ${{ github.workspace }}/.cache/huggingface
+      PYTHONPATH: src
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Restore HF/model cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/huggingface
+            outputs/models
+          key: ${{ runner.os }}-hf-${{ hashFiles('requirements.txt', 'config/experiment_config.json') }}
+          restore-keys: |
+            ${{ runner.os }}-hf-
+
+      - name: Install deps
+        run: make setup
+
+      - name: Run baseline
+        run: make baseline
+
+      - name: Train short-only micro-CPT
+        run: make train_short
+
+      - name: Train replay micro-CPT
+        run: make train_replay
+
+      - name: Final evaluation
+        run: make eval
+
+      - name: Build report
+        run: make report
+
+      - name: Prune temporary files
+        run: |
+          rm -rf ~/.cache/pip/http ~/.cache/pip/wheels || true
+          find . -type f -name '*.tmp' -delete
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-results
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            outputs/baseline_eval.json
+            outputs/train_short.json
+            outputs/train_replay.json
+            outputs/all_eval_metrics.json
+            outputs/summary.md
+            outputs/accuracy_plot.png
+            outputs/runtime_state.json
