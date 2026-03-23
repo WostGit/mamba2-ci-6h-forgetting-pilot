@@ -11,6 +11,7 @@ budget:
     eval_replay: 1200
 model:
   name: state-spaces/mamba2-130m
+  tokenizer_name: EleutherAI/gpt-neox-20b
   dtype: float32
   max_length: 8192
 training:

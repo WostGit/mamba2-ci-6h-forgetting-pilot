@@ -6,17 +6,21 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPTNeoXTokenizerFast
 
 
 def load_model_and_tokenizer(cfg: Dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load Mamba-2 model and tokenizer in CPU mode.
 
-    Runtime-saving and robustness choice: prefer the slow tokenizer path for
-    this checkpoint because the fast auto-conversion path is flaky in CI.
+    Runtime-saving and robustness choice: bypass AutoTokenizer for this model.
+    The checkpoint advertises a GPT-NeoX-style tokenizer, and the auto path is
+    flaky in CI due to a broken slow->fast conversion branch.
     """
     name = cfg["model"]["name"]
-    tok = AutoTokenizer.from_pretrained(name, use_fast=False)
+    tokenizer_name = cfg.get("model", {}).get("tokenizer_name", "EleutherAI/gpt-neox-20b")
+    tok = GPTNeoXTokenizerFast.from_pretrained(tokenizer_name)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(name)
     model.to("cpu")
     model.train()
