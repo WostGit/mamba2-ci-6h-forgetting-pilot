@@ -1,0 +1,41 @@
+seed: 1337
+budget:
+  hard_timeout_hours: 5.8
+  expected_hours_low: 2.0
+  expected_hours_high: 4.0
+  stage_estimates_seconds:
+    baseline_eval: 1500
+    train_short: 3600
+    eval_short: 1200
+    train_replay: 3600
+    eval_replay: 1200
+model:
+  name: state-spaces/mamba2-130m
+  tokenizer_name: EleutherAI/gpt-neox-20b
+  dtype: float32
+  max_length: 8192
+training:
+  max_steps: 80
+  fallback_steps: 60
+  batch_size: 1
+  train_seq_len: 256
+  lr: 5.0e-5
+  weight_decay: 0.0
+  grad_clip: 1.0
+  peft_fallback: lm_head_only
+  short_length: 256
+  replay_lengths: [256, 1024, 2048]
+evaluation:
+  lengths: [1024, 2048, 4096, 8192]
+  examples_per_length: 3
+  fallback_examples_per_length: 2
+  passkey_digits: 6
+paths:
+  output_dir: outputs
+  metrics_json: outputs/metrics.json
+  runtime_state_json: outputs/runtime_state.json
+  stage_log_jsonl: outputs/stage_log.jsonl
+  report_md: outputs/report.md
+  plot_png: outputs/passkey_accuracy.png
+  short_ckpt: outputs/ckpt_short.pt
+  replay_ckpt: outputs/ckpt_replay.pt

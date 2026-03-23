@@ -1,0 +1,57 @@
+name: ci-pilot
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  run-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      HF_HOME: ${{ github.workspace }}/.cache/huggingface
+      PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+      TRANSFORMERS_CACHE: ${{ github.workspace }}/.cache/huggingface
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Restore model/output caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/huggingface
+            outputs
+          key: mamba2-pilot-${{ runner.os }}-${{ hashFiles('requirements.txt', 'config.yaml') }}
+          restore-keys: |
+            mamba2-pilot-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: make setup
+
+      - name: Run CI pilot pipeline
+        run: make ci
+
+      - name: Cleanup temp files
+        run: |
+          find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-results
+          path: |
+            outputs/metrics.json
+            outputs/report.md
+            outputs/passkey_accuracy.png
+            outputs/stage_log.jsonl
+            outputs/runtime_state.json
+          if-no-files-found: error
+          retention-days: 7
