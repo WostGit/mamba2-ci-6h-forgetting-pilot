@@ -6,21 +6,38 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, GPTNeoXTokenizerFast
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, GPTNeoXTokenizerFast
+
+
+class CheckpointPairingError(RuntimeError):
+    """Raised when the configured checkpoint/model pairing is not trustworthy for CI."""
 
 
 def load_model_and_tokenizer(cfg: Dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load Mamba-2 model and tokenizer in CPU mode.
 
-    Runtime-saving and robustness choice: bypass AutoTokenizer for this model.
-    The checkpoint advertises a GPT-NeoX-style tokenizer, and the auto path is
-    flaky in CI due to a broken slow->fast conversion branch.
+    Runtime-saving and honesty choice: fail fast when the advertised checkpoint
+    metadata clearly disagrees with the loaded model shape, instead of burning
+    runner time on a long CI job that cannot produce trustworthy results.
     """
     name = cfg["model"]["name"]
     tokenizer_name = cfg.get("model", {}).get("tokenizer_name", "EleutherAI/gpt-neox-20b")
     tok = GPTNeoXTokenizerFast.from_pretrained(tokenizer_name)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
+
+    model_cfg = AutoConfig.from_pretrained(name)
+    hidden_size = getattr(model_cfg, 'hidden_size', None)
+    intermediate_size = getattr(model_cfg, 'intermediate_size', None)
+    if hidden_size is not None and intermediate_size is not None:
+        ratio = intermediate_size / max(hidden_size, 1)
+        if ratio >= 4.0:
+            raise CheckpointPairingError(
+                f"Configured checkpoint {name!r} resolves to hidden_size={hidden_size}, "
+                f"intermediate_size={intermediate_size} (ratio={ratio:.2f}), which is inconsistent with the "
+                "expected Mamba-2 130M scale. Refusing to run expensive CI on an unverified checkpoint/model pairing."
+            )
+
     model = AutoModelForCausalLM.from_pretrained(name)
     model.to("cpu")
     model.train()

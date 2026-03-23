@@ -13,7 +13,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.config import load_config
 from src.evaluation import evaluate_passkey
-from src.modeling import load_model_and_tokenizer
+from src.modeling import CheckpointPairingError, load_model_and_tokenizer
 from src.utils import load_runtime_state, set_seed
 
 
@@ -28,7 +28,13 @@ def main() -> None:
         stage_done(cfg, "baseline_eval", start)
         return
 
-    model, tok = load_model_and_tokenizer(cfg)
+    try:
+        model, tok = load_model_and_tokenizer(cfg)
+    except CheckpointPairingError as exc:
+        print(f"CHECKPOINT_PAIRING_ERROR: {exc}")
+        print("Fail-fast honesty: aborting baseline before expensive train/eval stages.")
+        raise SystemExit(2)
+
     state = load_runtime_state(cfg)
     metrics["baseline"] = evaluate_passkey(
         model,

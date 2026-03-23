@@ -20,6 +20,8 @@ Designed for a standard GitHub-hosted Ubuntu runner:
 
 Model target is fixed to **`state-spaces/mamba2-130m`**.
 
+> Current status note: if the checkpoint/config pairing cannot be verified as a real Mamba-2 130M match in CI, the pipeline is expected to fail fast during baseline loading instead of pretending the pilot is trustworthy.
+
 ## Why this fits GitHub Actions limits
 
 Runtime-safety decisions:
