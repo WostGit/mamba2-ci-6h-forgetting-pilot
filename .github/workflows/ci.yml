@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      HF_HOME: ${{ github.workspace }}/.hf_cache
+      TRANSFORMERS_CACHE: ${{ github.workspace }}/.hf_cache/transformers
+      PIP_CACHE_DIR: ${{ github.workspace }}/.pip_cache
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          path: .pip_cache
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Restore HF cache
+        uses: actions/cache@v4
+        with:
+          path: .hf_cache
+          key: hf-${{ runner.os }}-${{ hashFiles('config/experiment.json') }}
+
+      - name: Install deps
+        run: make setup
+
+      - name: Run CI pipeline
+        run: make ci
+
+      - name: Cleanup temp files
+        if: always()
+        run: |
+          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mamba2-ci-pilot-artifacts
+          path: |
+            outputs/metrics.json
+            outputs/summary.md
+            outputs/accuracy_vs_context.png
+            outputs/runtime_state.json
+            outputs/train_short.json
+            outputs/train_replay.json
+          if-no-files-found: warn
+          retention-days: 7
