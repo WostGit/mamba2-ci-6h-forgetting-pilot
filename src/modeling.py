@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Iterable, Tuple
 
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, GPTNeoXTokenizerFast
@@ -11,6 +11,43 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, GPTNeo
 
 class CheckpointPairingError(RuntimeError):
     """Raised when the configured checkpoint/model pairing is not trustworthy for CI."""
+
+
+def _first_present(obj: Any, names: Iterable[str]) -> Any:
+    for name in names:
+        value = getattr(obj, name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _validate_expected_mamba2_scale(name: str, model_cfg: Any) -> None:
+    """Reject configs that obviously are not the intended 130M-scale checkpoint.
+
+    Evidence from failed CI runs: the resolved config instantiated a 4096-wide
+    Mamba block while the downloaded checkpoint shard carried 768-wide weights.
+    That is not a recoverable transient — it is an untrustworthy checkpoint /
+    config pairing. We should fail before attempting full weight loading.
+    """
+    hidden_size = _first_present(model_cfg, ("hidden_size", "d_model", "model_dim"))
+    intermediate_size = _first_present(model_cfg, ("intermediate_size", "expand", "d_inner"))
+
+    if hidden_size is not None and hidden_size != 768:
+        raise CheckpointPairingError(
+            f"Configured checkpoint {name!r} resolved to hidden/model width {hidden_size}, "
+            "but this pilot is explicitly scoped to the 130M-scale Mamba-2 checkpoint "
+            "(expected width 768 based on the published checkpoint shards seen in CI). "
+            "Refusing to run expensive CI on an unverified config/checkpoint pairing."
+        )
+
+    if hidden_size is not None and intermediate_size is not None:
+        ratio = intermediate_size / max(hidden_size, 1)
+        if ratio >= 4.0:
+            raise CheckpointPairingError(
+                f"Configured checkpoint {name!r} resolves to hidden_size={hidden_size}, "
+                f"intermediate_size={intermediate_size} (ratio={ratio:.2f}), which is inconsistent with the "
+                "expected Mamba-2 130M scale. Refusing to run expensive CI on an unverified checkpoint/model pairing."
+            )
 
 
 def load_model_and_tokenizer(cfg: Dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
@@ -27,18 +64,17 @@ def load_model_and_tokenizer(cfg: Dict[str, Any]) -> Tuple[AutoModelForCausalLM,
         tok.pad_token = tok.eos_token
 
     model_cfg = AutoConfig.from_pretrained(name)
-    hidden_size = getattr(model_cfg, 'hidden_size', None)
-    intermediate_size = getattr(model_cfg, 'intermediate_size', None)
-    if hidden_size is not None and intermediate_size is not None:
-        ratio = intermediate_size / max(hidden_size, 1)
-        if ratio >= 4.0:
-            raise CheckpointPairingError(
-                f"Configured checkpoint {name!r} resolves to hidden_size={hidden_size}, "
-                f"intermediate_size={intermediate_size} (ratio={ratio:.2f}), which is inconsistent with the "
-                "expected Mamba-2 130M scale. Refusing to run expensive CI on an unverified checkpoint/model pairing."
-            )
+    _validate_expected_mamba2_scale(name, model_cfg)
 
-    model = AutoModelForCausalLM.from_pretrained(name)
+    try:
+        model = AutoModelForCausalLM.from_pretrained(name)
+    except RuntimeError as exc:
+        message = str(exc)
+        if "size mismatch" in message and "Mamba2RMSNorm" in message:
+            raise CheckpointPairingError(
+                f"Checkpoint/model load for {name!r} hit a hard size mismatch: {message}"
+            ) from exc
+        raise
     model.to("cpu")
     model.train()
     return model, tok
