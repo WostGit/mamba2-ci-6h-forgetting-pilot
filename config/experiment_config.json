@@ -1,0 +1,31 @@
+{
+  "experiment_name": "mamba2_130m_micro_cpt_forgetting_pilot",
+  "seed": 1234,
+  "model_name": "state-spaces/mamba2-130m",
+  "model_fallback_name": "state-spaces/mamba-130m-hf",
+  "dtype": "float32",
+  "output_dir": "outputs",
+  "train": {
+    "max_steps": 80,
+    "batch_size": 1,
+    "seq_len": 256,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0,
+    "grad_clip": 1.0,
+    "trainable_mode": "lm_head_only"
+  },
+  "eval": {
+    "context_lengths": [1024, 2048, 4096, 8192],
+    "examples_per_length": 3,
+    "max_new_tokens": 8
+  },
+  "runtime": {
+    "ci_budget_hours": 5.8,
+    "target_hours_low": 2.0,
+    "target_hours_high": 4.0,
+    "guard_eval_examples_stepdown": 2,
+    "guard_skip_length": 8192,
+    "guard_train_steps_stepdown": 60,
+    "fail_if_projected_over_budget": true
+  }
+}
