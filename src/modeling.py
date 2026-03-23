@@ -10,9 +10,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def load_model_and_tokenizer(cfg: Dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
-    """Load Mamba-2 model and tokenizer in CPU mode."""
+    """Load Mamba-2 model and tokenizer in CPU mode.
+
+    Runtime-saving and robustness choice: prefer the slow tokenizer path for
+    this checkpoint because the fast auto-conversion path is flaky in CI.
+    """
     name = cfg["model"]["name"]
-    tok = AutoTokenizer.from_pretrained(name)
+    tok = AutoTokenizer.from_pretrained(name, use_fast=False)
     model = AutoModelForCausalLM.from_pretrained(name)
     model.to("cpu")
     model.train()
